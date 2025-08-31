@@ -1,0 +1,14 @@
+[project]
+name = "pdf-extraction"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jupyterlab>=4.4.5",
+    "pypdfium2",
+    "ruff>=0.12.11",
+]
+
+[tool.uv.sources]
+pypdfium2 = { git = "https://github.com/pypdfium2-team/pypdfium2.git", rev = "746c4ac54273130c3bee6a29a5026ed2f24578e2" }

@@ -141,7 +141,7 @@ def main():
     pdf_path = args.pdf_path
 
     pdf = pypdfium2.PdfDocument(pdf_path)
-    print(pdf)
+    book_title = pdf.get_metadata_dict().get("Title", "Unknown Book Title")
     logging.info(f"{pdf_path=}")
 
     raw_content = extract(pdf)
@@ -173,7 +173,8 @@ def main():
         out = {
             "text": content,
             "metadata": {
-                "title": title,
+                "book_title": book_title,
+                "section_title": title,
                 "page_start": datum["bookmark"]["page_start"],
                 "page_end": datum["bookmark"]["page_end"],
                 "bookmark": {
