@@ -10,6 +10,12 @@ logging.basicConfig(
 )
 
 
+def normalize_title(title):
+    words = title.split()
+    words = [word for word in words if not word.isdigit()]
+    return " ".join(words).strip()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Extract Table of Contents and Content from a document."
@@ -29,6 +35,12 @@ def parse_args():
         default="configs/skip_sections.json",
         help="Path to the JSON file containing sections to skip during extraction.",
     )
+    parser.add_argument(
+        "--book_title",
+        type=str,
+        default="",
+        help="Title of the book being processed.",
+    )
     return parser.parse_args()
 
 
@@ -44,7 +56,7 @@ def extract_bookmarks_data(pdf):
     bookmarks_data = []
 
     for i, bookmark in enumerate(bookmarks[:-1]):
-        title = bookmark.get_title()
+        title = normalize_title(bookmark.get_title())
         level = bookmark.level
         num_children = bookmark.get_count()
 
@@ -83,7 +95,6 @@ def remove_overlap_with_next_section(list_content):
         si = last_page.find(next_page)
         if si != -1:
             content["list_content"][-1] = last_page[:si]
-            print(f"changed {i=}")
 
 
 def extract_content(pdf, bookmark):
@@ -118,11 +129,22 @@ def extract_content_for_all_bookmarks(pdf, bookmarks_data):
     return all_content
 
 
-def clean_text(text, title):
+def clean_text(text, section_title, book_title):
     text = text.strip()
     sentences = text.split("\n")
-    if sentences[-1].startswith(title):
+    if sentences[-1].startswith(section_title):
         sentences = sentences[:-1]
+        return "\n".join(sentences).strip()
+    
+    if len(sentences) >= 2:
+        ls = sentences[-2].strip().lower()
+        if ls.startswith(book_title.lower()):
+            print(f"Found {book_title=} in last line for {section_title=}")
+            return "\n".join(sentences[:-2]).strip()
+
+        ls = sentences[-1].strip().lower()
+        if ls.startswith(book_title.lower()):
+            return "\n".join(sentences[:-1]).strip()
     return "\n".join(sentences).strip()
 
 
@@ -136,12 +158,21 @@ def should_skip_section(bookmark, config_skip_sections):
             return True
     return False
 
+
 def main():
     args = parse_args()
     pdf_path = args.pdf_path
 
     pdf = pypdfium2.PdfDocument(pdf_path)
-    book_title = pdf.get_metadata_dict().get("Title", "Unknown Book Title")
+    stats = pdf.get_metadata_dict()
+    logging.info(f"PDF Metadata: {stats}")
+    stats["num_pages"] = len(pdf)
+
+    book_title = pdf.get_metadata_dict().get("Title")
+    if not book_title:
+        book_title = args.book_title
+    logging.info(f"{book_title=}")
+
     logging.info(f"{pdf_path=}")
 
     raw_content = extract(pdf)
@@ -150,22 +181,21 @@ def main():
 
     with open(args.skip_sections_json, "r") as fr:
         config_skip_sections = json.load(fr)
-    
+
     with open(out_dir / "raw_content.json", "w") as fw:
         json.dump(raw_content, fw, indent=4)
 
     content_dict = {}
 
-    fw = open(out_dir / "content.jsonl", "w")
+    fw = open(out_dir / "sections.jsonl", "w")
     for datum in raw_content:
         if should_skip_section(datum["bookmark"], config_skip_sections):
-            logging.info(f'Skipping section: {datum["bookmark"]["title"]}')
+            logging.info(f"Skipping section: {datum['bookmark']['title']}")
             continue
         title = datum["bookmark"]["title"]
-    
+
         list_content = [
-            clean_text(content, title)
-            for content in datum["list_content"]
+            clean_text(content, title, book_title) for content in datum["list_content"]
         ]
 
         list_content = [content for content in list_content if content]
@@ -181,14 +211,18 @@ def main():
                     "level": datum["bookmark"]["level"],
                     "page_start": datum["bookmark"]["page_start"],
                     "page_end": datum["bookmark"]["page_end"],
-                }
-            }
+                },
+            },
         }
         fw.write(json.dumps(out) + "\n")
         content_dict[title] = out
 
-    with open(out_dir / "content.json", "w") as fw:
+    with open(out_dir / "sections.json", "w") as fw:
         json.dump(content_dict, fw, indent=4)
+
+    with open(out_dir / "stats.json", "w") as fw:
+        json.dump(stats, fw, indent=4)
+
 
 if __name__ == "__main__":
     main()

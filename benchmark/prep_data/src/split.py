@@ -34,8 +34,10 @@ def main():
         for line in fr:
             datum = json.loads(line)
             text = datum["text"]
-            book_title = datum["metadata"]["book_title"]
+            book_title = datum["metadata"]["book_title"].strip()
             section_title = datum["metadata"]["section_title"]
+
+            if book_title == ""
             if book_title != "Unknown Book Title" and section_title:
                 prefix = f"This text is from the book: {book_title} and section: {section_title}\n\n"
             else:
