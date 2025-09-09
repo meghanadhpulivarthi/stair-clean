@@ -30,9 +30,9 @@ def parse_args():
         help="Path to save the extracted content.",
     )
     parser.add_argument(
-        "--skip_sections_json",
+        "--skip_json",
         type=str,
-        default="configs/skip_sections.json",
+        default="configs/skip.json",
         help="Path to the JSON file containing sections to skip during extraction.",
     )
     parser.add_argument(
@@ -41,11 +41,20 @@ def parse_args():
         default="",
         help="Title of the book being processed.",
     )
+
+    parser.add_argument(
+        "--min_words_in_a_section",
+        type=int,
+        default=5,
+    )
     return parser.parse_args()
 
 
 def extract(pdf):
     bookmarks_data = extract_bookmarks_data(pdf)
+    if not bookmarks_data:
+        logging.warning("No bookmarks found in the PDF.")
+        return []
     raw_content = extract_content_for_all_bookmarks(pdf, bookmarks_data)
     remove_overlap_with_next_section(raw_content)
     return raw_content
@@ -74,7 +83,7 @@ def extract_bookmarks_data(pdf):
                     "title": title,
                     "next_title": bookmarks[i + 1].get_title(),
                     "level": level,
-                    "num_childern": num_children,
+                    "num_children": num_children,
                     "page_start": index,
                     "view": (view_mode, view_pos),
                     "page_end": next_index,
@@ -129,25 +138,6 @@ def extract_content_for_all_bookmarks(pdf, bookmarks_data):
     return all_content
 
 
-def clean_text(text, section_title, book_title):
-    text = text.strip()
-    sentences = text.split("\n")
-    if sentences[-1].startswith(section_title):
-        sentences = sentences[:-1]
-        return "\n".join(sentences).strip()
-    
-    if len(sentences) >= 2:
-        ls = sentences[-2].strip().lower()
-        if ls.startswith(book_title.lower()):
-            print(f"Found {book_title=} in last line for {section_title=}")
-            return "\n".join(sentences[:-2]).strip()
-
-        ls = sentences[-1].strip().lower()
-        if ls.startswith(book_title.lower()):
-            return "\n".join(sentences[:-1]).strip()
-    return "\n".join(sentences).strip()
-
-
 def should_skip_section(bookmark, config_skip_sections):
     title = bookmark["title"]
     for section in config_skip_sections.get("skip_sections", []):
@@ -157,6 +147,67 @@ def should_skip_section(bookmark, config_skip_sections):
         if title.lower().startswith(section.lower()):
             return True
     return False
+
+
+def skip_content(text, section_title, book_title):
+    if text.lower() == section_title.lower() or text.lower() == book_title.lower():
+        logging.info(
+            f"Skipping section {section_title=} as content is same as title or book title"
+        )
+        return True
+    return False
+
+
+def build_final_content(list_content, section_title, book_title, skip_sentences_set, min_words):
+    def clean_content(t):
+        sentences = t.split("\n")
+        final_sentences = []
+        len_book_title = len(book_title)
+        for sentence in sentences:
+            src_sentence = sentence.strip().lower()
+            if not src_sentence:
+                continue
+            if src_sentence in skip_sentences_set:
+                logging.info(f"Skipping {sentence=}")
+                continue
+
+            si = src_sentence.find(book_title.lower())
+            if si != -1:
+                ratio_book_title_to_sentence = len_book_title / len(src_sentence)
+                if ratio_book_title_to_sentence > 0.8:
+                    logging.info(f"Skipping {sentence=}")
+                    continue
+                
+            final_sentences.append(sentence)
+        return "\n".join(final_sentences).strip()
+
+    list_content = [clean_content(content) for content in list_content]
+
+    list_content = [
+        content
+        for content in list_content
+        if not skip_content(content, section_title, book_title)
+    ]
+
+    list_content = [content for content in list_content if content]
+    content = "\n".join(list_content).strip()
+
+    content_lower = content.lower()
+    if content_lower == section_title.lower():
+        logging.info(f"Skipping section {section_title=} as content is same as title")
+        return ""
+
+    if content_lower == book_title.lower():
+        logging.info(
+            f"Skipping section {section_title=} as content is same as book title"
+        )
+        return ""
+
+    if len(content.split()) < min_words:
+        logging.info(f"Skipping section {section_title=} as content is too short")
+        return ""
+
+    return content
 
 
 def main():
@@ -179,27 +230,30 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(args.skip_sections_json, "r") as fr:
-        config_skip_sections = json.load(fr)
+    with open(args.skip_json, "r") as fr:
+        config_skip = json.load(fr)
 
     with open(out_dir / "raw_content.json", "w") as fw:
         json.dump(raw_content, fw, indent=4)
 
+    skip_sentences_set = set(
+        s.lower().strip()
+        for s in config_skip["skip_sentences"]
+        
+    )
     content_dict = {}
 
     fw = open(out_dir / "sections.jsonl", "w")
     for datum in raw_content:
-        if should_skip_section(datum["bookmark"], config_skip_sections):
+        if should_skip_section(datum["bookmark"], config_skip):
             logging.info(f"Skipping section: {datum['bookmark']['title']}")
             continue
         title = datum["bookmark"]["title"]
+        content = build_final_content(datum["list_content"], title, book_title, skip_sentences_set, args.min_words_in_a_section)
+        if not content:
+            logging.info(f"Skipping section {title=} as content is empty")
+            continue
 
-        list_content = [
-            clean_text(content, title, book_title) for content in datum["list_content"]
-        ]
-
-        list_content = [content for content in list_content if content]
-        content = "\n".join(list_content)
         out = {
             "text": content,
             "metadata": {
