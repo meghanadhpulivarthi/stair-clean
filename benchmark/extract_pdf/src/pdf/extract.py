@@ -150,11 +150,19 @@ def should_skip_section(bookmark, config_skip_sections):
 
 
 def skip_content(text, section_title, book_title):
-    if text.lower() == section_title.lower() or text.lower() == book_title.lower():
+    text_lower = text.lower()
+    if text_lower == section_title.lower():
         logging.info(
-            f"Skipping section {section_title=} as content is same as title or book title"
+            f"Skipping section as content is {section_title=}"
         )
         return True
+    
+    if book_title and text_lower == book_title.lower():
+        logging.info(
+            f"Skipping section as content is {book_title=}"
+        )
+        return True
+    
     return False
 
 
@@ -193,20 +201,26 @@ def build_final_content(list_content, section_title, book_title, skip_sentences_
     content = "\n".join(list_content).strip()
 
     content_lower = content.lower()
+    if not content_lower:
+        logging.info(f"Skipping section {section_title=} as content is empty")
+        return ""
+    
     if content_lower == section_title.lower():
         logging.info(f"Skipping section {section_title=} as content is same as title")
         return ""
 
-    if content_lower == book_title.lower():
+    if book_title and content_lower == book_title.lower():
         logging.info(
             f"Skipping section {section_title=} as content is same as book title"
         )
         return ""
 
     if len(content.split()) < min_words:
-        logging.info(f"Skipping section {section_title=} as content is too short")
+        logging.info(f"Skipping section {section_title=} as content is too short {content=}")
         return ""
 
+    #Replace "\r\n" with "\n\n"
+    content = content.replace("\r\n", "\n\n")
     return content
 
 
@@ -223,7 +237,6 @@ def main():
     if not book_title:
         book_title = args.book_title
     logging.info(f"{book_title=}")
-
     logging.info(f"{pdf_path=}")
 
     raw_content = extract(pdf)
@@ -246,12 +259,12 @@ def main():
     fw = open(out_dir / "sections.jsonl", "w")
     for datum in raw_content:
         if should_skip_section(datum["bookmark"], config_skip):
-            logging.info(f"Skipping section: {datum['bookmark']['title']}")
+            logging.info(f"Skipping section {datum['bookmark']['title']=} as per config")
             continue
+
         title = datum["bookmark"]["title"]
         content = build_final_content(datum["list_content"], title, book_title, skip_sentences_set, args.min_words_in_a_section)
         if not content:
-            logging.info(f"Skipping section {title=} as content is empty")
             continue
 
         out = {
