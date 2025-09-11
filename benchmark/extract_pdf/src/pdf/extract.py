@@ -138,7 +138,10 @@ def extract_content_for_all_bookmarks(pdf, bookmarks_data):
     return all_content
 
 
-def should_skip_section(bookmark, config_skip_sections):
+def should_skip_section(bookmark, config_skip_sections, book_title):
+    if book_title and bookmark["title"].lower() == book_title.lower():
+        logging.info(f"Skipping section as title is same as book title {book_title=}")
+        return True
     title = bookmark["title"]
     for section in config_skip_sections.get("skip_sections", []):
         if title.lower() == section.lower():
@@ -166,7 +169,7 @@ def skip_content(text, section_title, book_title):
     return False
 
 
-def build_final_content(list_content, section_title, book_title, skip_sentences_set, min_words):
+def build_final_content(list_content, section_title, book_title, skip_sentences_set, min_words, remove_last_line=False):
     def clean_content(t):
         sentences = t.split("\n")
         final_sentences = []
@@ -258,7 +261,7 @@ def main():
 
     fw = open(out_dir / "sections.jsonl", "w")
     for datum in raw_content:
-        if should_skip_section(datum["bookmark"], config_skip):
+        if should_skip_section(datum["bookmark"], config_skip, book_title):
             logging.info(f"Skipping section {datum['bookmark']['title']=} as per config")
             continue
 

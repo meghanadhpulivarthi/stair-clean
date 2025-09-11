@@ -2,4 +2,5 @@
 DATASET_ID="${1}"
 echo "Extracting PDF for dataset ID: ${DATASET_ID}"
 bash scripts/pdf/extract.sh "${DATASET_ID}"
-bash scripts/chunk/split.sh "${DATASET_ID}"
+bash scripts/tokens/stats.sh "${DATASET_ID}"
+bash scripts/chunk/split_all.sh "${DATASET_ID}" 3.45

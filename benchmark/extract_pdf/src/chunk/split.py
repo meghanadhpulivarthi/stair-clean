@@ -13,7 +13,7 @@ def parse_arguments():
     parser.add_argument("--input_jsonl", type=str)
     parser.add_argument("--output_jsonl", type=str)
     parser.add_argument("--max_tokens", type=int, default=1024)
-    parser.add_argument("--token_to_char", type=int, default=4)
+    parser.add_argument("--token_to_char", type=float, default=4.0)
     parser.add_argument("--chunk_overlap", type=int, default=128)
     parser.add_argument("--add_prefix", action="store_true")
     return parser.parse_args()
@@ -23,8 +23,10 @@ def main():
     args = parse_arguments()
     logging.info(f"{args=}")
 
+    chunk_size = int(args.max_tokens * args.token_to_char)
+
     rcts = RecursiveCharacterTextSplitter(
-        chunk_size=args.max_tokens * args.token_to_char,
+        chunk_size=chunk_size,
         chunk_overlap=args.chunk_overlap,
     )
 
@@ -35,12 +37,24 @@ def main():
             datum = json.loads(line)
             text = datum["text"]
             book_title = datum["metadata"]["book_title"].strip()
-            section_title = datum["metadata"]["section_title"]
+            section_title = datum["metadata"]["section_title"].strip()
 
-            prefix = f"This text is from the book: {book_title} and section: {section_title}\n"
+            if book_title and section_title:
+                prefix = f"This text is from the Book: {book_title} and Section: {section_title}\n\n"
+            elif book_title:
+                prefix = f"This text is from the Book: {book_title}\n\n"
+            elif section_title:
+                prefix = f"This text is from the Section: {section_title}\n\n"
+            else:
+                prefix = ""
             if not args.add_prefix:
                 prefix = ""
-            for chunk in rcts.split_text(text):
+            chunks = rcts.split_text(text)
+            if len(chunks) > 1:
+                logging.info(
+                    f"Split into {len(chunks)} chunks for book_title: {book_title}, section_title: {section_title} {chunk_size=}"
+                )
+            for chunk in chunks:
                 datum["text"] = prefix + chunk
                 fw.write(json.dumps(datum) + "\n")
     fw.close()
