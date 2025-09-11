@@ -1,4 +1,0 @@
-{
-  "skip_sections": ["Acknowledgements", "About the Authors", "Contents", "Preface", "Creative Commons License", "Recommended Citations", "toc"],
-  "skip_sections_startswith": ["Preface to the"]
-}
