@@ -222,8 +222,6 @@ def build_final_content(list_content, section_title, book_title, skip_sentences_
         logging.info(f"Skipping section {section_title=} as content is too short {content=}")
         return ""
 
-    #Replace "\r\n" with "\n\n"
-    content = content.replace("\r\n", "\n\n")
     return content
 
 

@@ -36,25 +36,21 @@ def main():
         for line in fr:
             datum = json.loads(line)
             text = datum["text"]
-            book_title = datum["metadata"]["book_title"].strip()
-            section_title = datum["metadata"]["section_title"].strip()
 
-            if book_title and section_title:
-                prefix = f"This text is from the Book: {book_title} and Section: {section_title}\n\n"
-            elif book_title:
-                prefix = f"This text is from the Book: {book_title}\n\n"
-            elif section_title:
-                prefix = f"This text is from the Section: {section_title}\n\n"
+            if args.add_prefix:
+                book_title = datum["metadata"]["book_title"].strip()
+                section_title = datum["metadata"]["section_title"].strip()
+
+                if book_title and section_title:
+                    prefix = f"This text is from the Book: {book_title} and Section: {section_title}\n\n"
+                elif book_title:
+                    prefix = f"This text is from the Book: {book_title}\n\n"
+                elif section_title:
+                    prefix = f"This text is from the Section: {section_title}\n\n"
             else:
                 prefix = ""
-            if not args.add_prefix:
-                prefix = ""
-            chunks = rcts.split_text(text)
-            if len(chunks) > 1:
-                logging.info(
-                    f"Split into {len(chunks)} chunks for book_title: {book_title}, section_title: {section_title} {chunk_size=}"
-                )
-            for chunk in chunks:
+
+            for chunk in rcts.split_text(text):
                 datum["text"] = prefix + chunk
                 fw.write(json.dumps(datum) + "\n")
     fw.close()
