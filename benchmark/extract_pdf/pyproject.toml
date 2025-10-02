@@ -10,6 +10,7 @@ dependencies = [
     "protobuf>=6.32.0",
     "pypdfium2",
     "ruff>=0.12.11",
+    "sentence-splitter>=1.4",
     "sentencepiece>=0.2.1",
     "transformers>=4.56.1",
 ]

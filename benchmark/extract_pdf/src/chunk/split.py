@@ -24,10 +24,11 @@ def main():
     logging.info(f"{args=}")
 
     chunk_size = int(args.max_tokens * args.token_to_char)
+    chunk_overlap = int(args.chunk_overlap * args.token_to_char)    
 
     rcts = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
-        chunk_overlap=args.chunk_overlap,
+        chunk_overlap=chunk_overlap
     )
 
     fw = open(args.output_jsonl, "w")

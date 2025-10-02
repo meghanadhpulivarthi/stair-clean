@@ -113,8 +113,13 @@ def extract_content(pdf, bookmark):
     list_content = []
     for page_index in range(page_start, page_end + 1):
         text_page = pdf[page_index].get_textpage()
+
         if page_index == page_start:
-            text_searcher = text_page.search(title)
+            try:
+                text_searcher = text_page.search(title)
+            except Exception as e:
+                print(f"Error searching for title {title=} on page {page_index=}: {e}")
+                continue
             search_result = text_searcher.get_next()
             if search_result:
                 content = text_page.get_text_range(search_result[0])
@@ -149,27 +154,34 @@ def should_skip_section(bookmark, config_skip_sections, book_title):
     for section in config_skip_sections.get("skip_sections_startswith", []):
         if title.lower().startswith(section.lower()):
             return True
+
+    for section in config_skip_sections.get("skip_sections_endswith", []):
+        if title.lower().endswith(section.lower()):
+            return True
     return False
 
 
 def skip_content(text, section_title, book_title):
     text_lower = text.lower()
     if text_lower == section_title.lower():
-        logging.info(
-            f"Skipping section as content is {section_title=}"
-        )
+        logging.info(f"Skipping section as content is {section_title=}")
         return True
-    
+
     if book_title and text_lower == book_title.lower():
-        logging.info(
-            f"Skipping section as content is {book_title=}"
-        )
+        logging.info(f"Skipping section as content is {book_title=}")
         return True
-    
+
     return False
 
 
-def build_final_content(list_content, section_title, book_title, skip_sentences_set, min_words, remove_last_line=False):
+def build_final_content(
+    list_content,
+    section_title,
+    book_title,
+    skip_sentences_set,
+    min_words,
+    remove_last_line=False,
+):
     def clean_content(t):
         sentences = t.split("\n")
         final_sentences = []
@@ -188,7 +200,7 @@ def build_final_content(list_content, section_title, book_title, skip_sentences_
                 if ratio_book_title_to_sentence > 0.8:
                     logging.info(f"Skipping {sentence=}")
                     continue
-                
+
             final_sentences.append(sentence)
         return "\n".join(final_sentences).strip()
 
@@ -207,7 +219,7 @@ def build_final_content(list_content, section_title, book_title, skip_sentences_
     if not content_lower:
         logging.info(f"Skipping section {section_title=} as content is empty")
         return ""
-    
+
     if content_lower == section_title.lower():
         logging.info(f"Skipping section {section_title=} as content is same as title")
         return ""
@@ -219,11 +231,20 @@ def build_final_content(list_content, section_title, book_title, skip_sentences_
         return ""
 
     if len(content.split()) < min_words:
-        logging.info(f"Skipping section {section_title=} as content is too short {content=}")
+        logging.info(
+            f"Skipping section {section_title=} as content is too short {content=}"
+        )
         return ""
 
     return content
 
+def extract_all_content(pdf):
+    pages = []
+    for page_index in range(len(pdf)):
+        text_page = pdf[page_index].get_textpage()
+        content = text_page.get_text_range()
+        pages.append(content)
+    return pages
 
 def main():
     args = parse_args()
@@ -231,8 +252,8 @@ def main():
 
     pdf = pypdfium2.PdfDocument(pdf_path)
     stats = pdf.get_metadata_dict()
-    logging.info(f"PDF Metadata: {stats}")
     stats["num_pages"] = len(pdf)
+    logging.info(f"PDF Metadata: {stats}")
 
     book_title = pdf.get_metadata_dict().get("Title")
     if not book_title:
@@ -240,31 +261,50 @@ def main():
     logging.info(f"{book_title=}")
     logging.info(f"{pdf_path=}")
 
-    raw_content = extract(pdf)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    raw_content = extract(pdf)
+    if not raw_content:
+        pages = extract_all_content(pdf)
+        with open(out_dir / "sections.jsonl", "w") as fw:
+            content = "\n".join(pages).strip()
+            out = {
+                "text": content,
+                "metadata": {
+                    "book_title": book_title,
+                    "section_title": book_title
+                },
+            }
+            fw.write(json.dumps(out) + "\n")
+        return
+    
+    
     with open(args.skip_json, "r") as fr:
         config_skip = json.load(fr)
 
     with open(out_dir / "raw_content.json", "w") as fw:
         json.dump(raw_content, fw, indent=4)
 
-    skip_sentences_set = set(
-        s.lower().strip()
-        for s in config_skip["skip_sentences"]
-        
-    )
+    skip_sentences_set = set(s.lower().strip() for s in config_skip["skip_sentences"])
     content_dict = {}
 
     fw = open(out_dir / "sections.jsonl", "w")
     for datum in raw_content:
         if should_skip_section(datum["bookmark"], config_skip, book_title):
-            logging.info(f"Skipping section {datum['bookmark']['title']=} as per config")
+            logging.info(
+                f"Skipping section {datum['bookmark']['title']=} as per config"
+            )
             continue
 
         title = datum["bookmark"]["title"]
-        content = build_final_content(datum["list_content"], title, book_title, skip_sentences_set, args.min_words_in_a_section)
+        content = build_final_content(
+            datum["list_content"],
+            title,
+            book_title,
+            skip_sentences_set,
+            args.min_words_in_a_section,
+        )
         if not content:
             continue
 
