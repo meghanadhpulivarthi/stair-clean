@@ -77,6 +77,9 @@ def extract_bookmarks_data(pdf):
                 next_dest.get_index(),
                 next_dest.get_view(),
             )
+            if index is None or next_index is None:
+                print(f"Bookmark {i} index missing")
+                continue
 
             bookmarks_data.append(
                 {
@@ -180,8 +183,15 @@ def build_final_content(
     book_title,
     skip_sentences_set,
     min_words,
-    remove_last_line=False,
+    config_skip
 ):
+    def should_skip_sentence(src_sentence):
+        for s in config_skip["skip_sentence_contains"]:
+            if s.lower() in src_sentence:
+                logging.info(f"Skipping {src_sentence=}")
+                return True
+        return False
+
     def clean_content(t):
         sentences = t.split("\n")
         final_sentences = []
@@ -192,6 +202,10 @@ def build_final_content(
                 continue
             if src_sentence in skip_sentences_set:
                 logging.info(f"Skipping {sentence=}")
+                continue
+
+            
+            if should_skip_sentence(src_sentence):
                 continue
 
             si = src_sentence.find(book_title.lower())
@@ -236,6 +250,7 @@ def build_final_content(
         )
         return ""
 
+    # print(content)
     return content
 
 def extract_all_content(pdf):
@@ -304,6 +319,7 @@ def main():
             book_title,
             skip_sentences_set,
             args.min_words_in_a_section,
+            config_skip
         )
         if not content:
             continue
