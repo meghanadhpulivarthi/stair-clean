@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from tqdm import tqdm
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -16,8 +17,15 @@ def parse_arguments():
     parser.add_argument("--token_to_char", type=float, default=4.0)
     parser.add_argument("--chunk_overlap", type=int, default=128)
     parser.add_argument("--add_prefix", action="store_true")
+    parser.add_argument("--col_prefix", type=str, default="doc_id")
     return parser.parse_args()
 
+
+def count_lines(file_path):
+    with open(file_path, "r") as f:
+        for i, _ in enumerate(f):
+            pass
+    return i + 1
 
 def main():
     args = parse_arguments()
@@ -34,20 +42,13 @@ def main():
     fw = open(args.output_jsonl, "w")
 
     with open(args.input_jsonl, "r") as fr:
-        for line in fr:
+        for line in tqdm(fr, total=count_lines(args.input_jsonl), desc="Processing lines"):
             datum = json.loads(line)
             text = datum["text"]
 
             if args.add_prefix:
-                book_title = datum["metadata"]["book_title"].strip()
-                section_title = datum["metadata"]["section_title"].strip()
-
-                if book_title and section_title:
-                    prefix = f"This text is from the Book: {book_title} and Section: {section_title}\n\n"
-                elif book_title:
-                    prefix = f"This text is from the Book: {book_title}\n\n"
-                elif section_title:
-                    prefix = f"This text is from the Section: {section_title}\n\n"
+                prefix = f"This document is about {datum["metadata"][args.col_prefix]}. "
+                
             else:
                 prefix = ""
 

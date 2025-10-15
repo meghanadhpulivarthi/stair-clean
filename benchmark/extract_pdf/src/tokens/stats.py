@@ -3,12 +3,18 @@ import json
 import logging
 
 from pathlib import Path
+from tqdm import tqdm
 from transformers import AutoTokenizer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
+def count_lines(file_path):
+    with open(file_path, "r") as f:
+        for i, _ in enumerate(f):
+            pass
+    return i + 1
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -30,7 +36,7 @@ def main():
     num_chars = 0
 
     with open(args.input_jsonl, "r") as fr:
-        for line in fr:
+        for line in tqdm(fr, total=count_lines(args.input_jsonl), desc="Processing lines"):
             data = json.loads(line)
             text = data["text"]
 
