@@ -3,7 +3,8 @@ DATASET_ID="${1}"
 BOOK_TITLE="${2}"
 
 DATA_DIR="${HOME}/data/ki_data"
-DOCS_JSONL="${DATA_DIR}/cpt/${DATASET_ID}/sections.jsonl"
+DST_DIR="${DATA_DIR}/dsi/${DATASET_ID}"
+DOCS_JSONL="${DST_DIR}/docs.jsonl"
 
 PDF_PATH="${DATA_DIR}/raw/${DATASET_ID}/content.pdf"
 OUT_DIR="${DATA_DIR}/cpt/${DATASET_ID}"

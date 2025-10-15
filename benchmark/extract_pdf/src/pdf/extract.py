@@ -43,6 +43,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--sections_jsonl",
+        type=str,
+        default="sections.jsonl",
+    )
+
+    parser.add_argument(
         "--min_words_in_a_section",
         type=int,
         default=5,
@@ -50,7 +56,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def extract(pdf):
+def extract_raw_content(pdf):
     bookmarks_data = extract_bookmarks_data(pdf)
     if not bookmarks_data:
         logging.warning("No bookmarks found in the PDF.")
@@ -178,12 +184,7 @@ def skip_content(text, section_title, book_title):
 
 
 def build_final_content(
-    list_content,
-    section_title,
-    book_title,
-    skip_sentences_set,
-    min_words,
-    config_skip
+    list_content, section_title, book_title, skip_sentences_set, min_words, config_skip
 ):
     def should_skip_sentence(src_sentence):
         for s in config_skip["skip_sentence_contains"]:
@@ -204,7 +205,6 @@ def build_final_content(
                 logging.info(f"Skipping {sentence=}")
                 continue
 
-            
             if should_skip_sentence(src_sentence):
                 continue
 
@@ -253,6 +253,7 @@ def build_final_content(
     # print(content)
     return content
 
+
 def extract_all_content(pdf):
     pages = []
     for page_index in range(len(pdf)):
@@ -260,6 +261,96 @@ def extract_all_content(pdf):
         content = text_page.get_text_range()
         pages.append(content)
     return pages
+
+
+def assign_section_numbers(nodes):
+    section_nums = {}
+    last_level = 0
+    chapters = {}
+    levels, prefix = [], []
+
+    for node_num, node in enumerate(nodes):
+        print(node)
+        level = node["metadata"]["bookmark"]["level"]
+
+        while levels and level < last_level:
+            if last_level in chapters:
+                del chapters[last_level]
+            last_level = levels.pop()
+            prefix.pop()
+
+        if levels and levels[-1] == level:
+            levels.pop()
+            prefix.pop()
+
+        chapters[level] = chapters.get(level, 0) + 1
+        prefix.append(str(chapters[level]))
+        levels.append(level)
+        last_level = level
+
+        section_nums[node_num] = ".".join(prefix)
+    return section_nums
+
+
+def assign_unique_doc_ids(nodes):
+    final_nodes = []
+    section_nums = assign_section_numbers(nodes)
+
+    for node_index, node in enumerate(nodes):
+        doc_id = section_nums[node_index]
+        bookmark_title = node["metadata"]["section_title"].strip()
+        if bookmark_title:
+            doc_id += f" {bookmark_title}"
+        node["doc_id"] = doc_id
+        final_nodes.append(node)
+    return final_nodes
+
+def filter_raw_content(raw_content, args, book_title, out_dir):
+    with open(args.skip_json, "r") as fr:
+        config_skip = json.load(fr)
+
+    skip_sentences_set = set(s.lower().strip() for s in config_skip["skip_sentences"])
+    
+    nodes = []
+
+    with open(out_dir / args.sections_jsonl, "w") as fw:
+        for datum in raw_content:
+            if should_skip_section(datum["bookmark"], config_skip, book_title):
+                logging.info(
+                    f"Skipping section {datum['bookmark']['title']=} as per config"
+                )
+                continue
+
+            title = datum["bookmark"]["title"]
+            content = build_final_content(
+                datum["list_content"],
+                title,
+                book_title,
+                skip_sentences_set,
+                args.min_words_in_a_section,
+                config_skip,
+            )
+            if not content:
+                continue
+
+            section_datum = {
+                "text": content,
+                "metadata": {
+                    "book_title": book_title,
+                    "section_title": title,
+                    "page_start": datum["bookmark"]["page_start"],
+                    "page_end": datum["bookmark"]["page_end"],
+                    "bookmark": {
+                        "level": datum["bookmark"]["level"],
+                        "page_start": datum["bookmark"]["page_start"],
+                        "page_end": datum["bookmark"]["page_end"],
+                    },
+                },
+            }
+            fw.write(json.dumps(section_datum) + "\n")
+            nodes.append(section_datum)
+    return nodes
+    
 
 def main():
     args = parse_args()
@@ -279,74 +370,33 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_content = extract(pdf)
+    raw_content = extract_raw_content(pdf)
     if not raw_content:
         pages = extract_all_content(pdf)
         with open(out_dir / "sections.jsonl", "w") as fw:
             content = "\n".join(pages).strip()
             out = {
                 "text": content,
-                "metadata": {
-                    "book_title": book_title,
-                    "section_title": book_title
-                },
+                "metadata": {"book_title": book_title, "section_title": book_title},
             }
             fw.write(json.dumps(out) + "\n")
         return
-    
-    
-    with open(args.skip_json, "r") as fr:
-        config_skip = json.load(fr)
 
+    
     with open(out_dir / "raw_content.json", "w") as fw:
         json.dump(raw_content, fw, indent=4)
 
-    skip_sentences_set = set(s.lower().strip() for s in config_skip["skip_sentences"])
-    content_dict = {}
+    nodes = filter_raw_content(raw_content, args, book_title, out_dir)
+    nodes = assign_unique_doc_ids(nodes)
 
-    fw = open(out_dir / "sections.jsonl", "w")
-    for datum in raw_content:
-        if should_skip_section(datum["bookmark"], config_skip, book_title):
-            logging.info(
-                f"Skipping section {datum['bookmark']['title']=} as per config"
-            )
-            continue
+    sections_json = args.sections_jsonl.replace(".jsonl", ".json")
+    with open(out_dir / sections_json, "w") as fw:
+        json.dump(nodes, fw, indent=4)
+    
 
-        title = datum["bookmark"]["title"]
-        content = build_final_content(
-            datum["list_content"],
-            title,
-            book_title,
-            skip_sentences_set,
-            args.min_words_in_a_section,
-            config_skip
-        )
-        if not content:
-            continue
-
-        out = {
-            "text": content,
-            "metadata": {
-                "book_title": book_title,
-                "section_title": title,
-                "page_start": datum["bookmark"]["page_start"],
-                "page_end": datum["bookmark"]["page_end"],
-                "bookmark": {
-                    "level": datum["bookmark"]["level"],
-                    "page_start": datum["bookmark"]["page_start"],
-                    "page_end": datum["bookmark"]["page_end"],
-                },
-            },
-        }
-        fw.write(json.dumps(out) + "\n")
-        content_dict[title] = out
-
-    with open(out_dir / "sections.json", "w") as fw:
-        json.dump(content_dict, fw, indent=4)
-
-    with open(out_dir / "stats.json", "w") as fw:
-        json.dump(stats, fw, indent=4)
-
+    with open(out_dir / args.sections_jsonl, "w") as fw:
+        for node in nodes:
+            fw.write(json.dumps(node) + "\n")
 
 if __name__ == "__main__":
     main()
