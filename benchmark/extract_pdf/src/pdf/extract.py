@@ -299,18 +299,17 @@ def assign_unique_doc_ids(nodes):
     for node_index, node in enumerate(nodes):
         doc_id = section_nums[node_index]
         bookmark_title = node["metadata"]["section_title"].strip()
-        if bookmark_title:
-            doc_id += f" {bookmark_title}"
-        node["doc_id"] = doc_id
+        node["doc_id"] = [doc_id, bookmark_title]
         final_nodes.append(node)
     return final_nodes
+
 
 def filter_raw_content(raw_content, args, book_title, out_dir):
     with open(args.skip_json, "r") as fr:
         config_skip = json.load(fr)
 
     skip_sentences_set = set(s.lower().strip() for s in config_skip["skip_sentences"])
-    
+
     nodes = []
 
     with open(out_dir / args.sections_jsonl, "w") as fw:
@@ -350,7 +349,7 @@ def filter_raw_content(raw_content, args, book_title, out_dir):
             fw.write(json.dumps(section_datum) + "\n")
             nodes.append(section_datum)
     return nodes
-    
+
 
 def main():
     args = parse_args()
@@ -382,7 +381,6 @@ def main():
             fw.write(json.dumps(out) + "\n")
         return
 
-    
     with open(out_dir / "raw_content.json", "w") as fw:
         json.dump(raw_content, fw, indent=4)
 
@@ -392,11 +390,11 @@ def main():
     sections_json = args.sections_jsonl.replace(".jsonl", ".json")
     with open(out_dir / sections_json, "w") as fw:
         json.dump(nodes, fw, indent=4)
-    
 
     with open(out_dir / args.sections_jsonl, "w") as fw:
         for node in nodes:
             fw.write(json.dumps(node) + "\n")
+
 
 if __name__ == "__main__":
     main()
