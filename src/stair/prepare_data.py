@@ -29,8 +29,14 @@ def derive_book_title(corpus_path):
     # turn a filename stem like "sourdough_bread_guide" into a readable
     # title like "Sourdough Bread Guide" for use in QA-generation prompts
     stem = Path(corpus_path).stem
-    words = stem.replace("_", " ").replace("-", " ").split()
-    return " ".join(word.capitalize() for word in words)
+    readable_stem = stem.replace("_", " ").replace("-", " ")
+    words = readable_stem.split()
+
+    capitalized_words = []
+    for word in words:
+        capitalized_words.append(word.capitalize())
+
+    return " ".join(capitalized_words)
 
 
 def build_default_llm_call(config):
