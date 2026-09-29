@@ -1,12 +1,13 @@
-import logging
-
 import pypdfium2
 
 
 def normalize_title(title):
     words = title.split()
-    words = [word for word in words if not word.isdigit()]
-    return " ".join(words).strip()
+    non_digit_words = []
+    for word in words:
+        if not word.isdigit():
+            non_digit_words.append(word)
+    return " ".join(non_digit_words).strip()
 
 
 def extract_bookmarks_data(pdf):
@@ -20,12 +21,12 @@ def extract_bookmarks_data(pdf):
 
         dest = bookmark.get_dest()
         if not dest:
-            logging.warning(f"Bookmark {bookmark_index} dest missing")
+            print(f"Bookmark {bookmark_index} dest missing")
             continue
 
         index = dest.get_index()
         if index is None:
-            logging.warning(f"Bookmark {bookmark_index} index missing")
+            print(f"Bookmark {bookmark_index} index missing")
             continue
 
         if bookmark_index + 1 < len(bookmarks):
@@ -140,10 +141,21 @@ def build_final_content(list_content, section_title, book_title, skip_sentences_
             final_sentences.append(sentence)
         return "\n".join(final_sentences).strip()
 
-    list_content = [clean_content(content) for content in list_content]
-    list_content = [content for content in list_content if not skip_content(content, section_title, book_title)]
-    list_content = [content for content in list_content if content]
-    content = "\n".join(list_content).strip()
+    cleaned_list_content = []
+    for content in list_content:
+        cleaned_list_content.append(clean_content(content))
+
+    non_skipped_list_content = []
+    for content in cleaned_list_content:
+        if not skip_content(content, section_title, book_title):
+            non_skipped_list_content.append(content)
+
+    non_empty_list_content = []
+    for content in non_skipped_list_content:
+        if content:
+            non_empty_list_content.append(content)
+
+    content = "\n".join(non_empty_list_content).strip()
 
     content_lower = content.lower()
     if not content_lower:
@@ -227,16 +239,19 @@ def extract_sections_from_pdf(pdf_path, book_title, skip_config, min_words_in_a_
 
     bookmarks_data = extract_bookmarks_data(pdf)
     if not bookmarks_data:
-        logging.warning("No bookmarks found in the PDF; treating it as a single section.")
+        print("No bookmarks found in the PDF; treating it as a single section.")
         return extract_all_content_as_single_section(pdf, book_title)
 
-    raw_sections = [
-        {"bookmark": bookmark, "list_content": extract_content_for_bookmark(pdf, bookmark)}
-        for bookmark in bookmarks_data
-    ]
+    raw_sections = []
+    for bookmark in bookmarks_data:
+        raw_sections.append(
+            {"bookmark": bookmark, "list_content": extract_content_for_bookmark(pdf, bookmark)}
+        )
     remove_overlap_with_next_section(raw_sections)
 
-    skip_sentences_set = set(sentence.lower().strip() for sentence in skip_config.get("skip_sentences", []))
+    skip_sentences_set = set()
+    for sentence in skip_config.get("skip_sentences", []):
+        skip_sentences_set.add(sentence.lower().strip())
 
     nodes = []
     for raw_section in raw_sections:
