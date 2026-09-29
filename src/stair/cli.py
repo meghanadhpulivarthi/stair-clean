@@ -2,6 +2,7 @@ import argparse
 import sys
 
 from stair.config import resolve_config
+from stair.prepare_data import run_prepare_data
 
 
 def add_prepare_data_subcommand(subparsers):
@@ -93,12 +94,21 @@ def main(argv=None):
         parser.print_usage(sys.stderr)
         return 1
 
+    resolved_config = None
     if hasattr(args, "config"):
         try:
-            resolve_config(override_path=args.config)
+            resolved_config = resolve_config(override_path=args.config)
         except (OSError, ValueError) as error:
             print(f"stair {args.subcommand}: {error}", file=sys.stderr)
             return 1
+
+    if args.subcommand == "prepare-data":
+        try:
+            run_prepare_data(args.corpus, args.out, resolved_config)
+        except (OSError, ValueError) as error:
+            print(f"stair prepare-data: {error}", file=sys.stderr)
+            return 1
+        return 0
 
     print(f"stair {args.subcommand}: not implemented yet", file=sys.stderr)
     return 1
