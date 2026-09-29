@@ -114,6 +114,36 @@ def test_prepare_data_with_config_pointing_at_a_directory_fails_loudly(tmp_path)
     assert "Traceback" not in result.stderr
 
 
+def test_train_with_override_nulling_out_a_config_section_fails_loudly_not_with_a_traceback(tmp_path):
+    # A user's override YAML sets a whole top-level section to nothing
+    # ("training:" with no value parses as null in YAML) - the key name
+    # itself is valid per resolve_config's key-existence check, but the
+    # section's value is now None instead of a dict, so a later
+    # config["training"]["num_gpus"] lookup inside run_train raises
+    # TypeError - outside the (OSError, ValueError) that the CLI's train
+    # branch currently catches, and the same broadened-exception-handling
+    # gap already fixed for stair prepare-data and stair eval
+    override_path = tmp_path / "empty_training_section.yaml"
+    override_path.write_text("training:\n")
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "train.jsonl").write_text("")
+    (data_dir / "val.jsonl").write_text("")
+    (data_dir / "toc.json").write_text("{}")
+    out_dir = tmp_path / "out"
+
+    result = run_stair(
+        "train",
+        "--data", str(data_dir),
+        "--out", str(out_dir),
+        "--config", str(override_path),
+    )
+
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "stair train:" in result.stderr
+
+
 def test_eval_with_run_config_missing_model_name_fails_loudly_not_with_a_traceback(tmp_path):
     # run_dir's own config.json (written by `stair train`) is missing the
     # model.name key that build_default_generate_call reads to load the

@@ -137,7 +137,12 @@ def main(argv=None):
     if args.subcommand == "train":
         try:
             result = run_train(args.data, args.out, resolved_config)
-        except (OSError, ValueError) as error:
+        # widened beyond (OSError, ValueError), the same pattern already
+        # used for stair prepare-data's and stair eval's branches: a
+        # malformed override config (e.g. a whole section nulled out) or a
+        # real training run can raise exceptions that aren't OSError or
+        # ValueError, and those should still get a clean one-line message
+        except Exception as error:
             print(f"stair train: {error}", file=sys.stderr)
             return 1
         return 0 if result["returncode"] == 0 else 1
