@@ -56,6 +56,9 @@ uv run stair report-eval --run <run-dir>
 Run any command with `--help` to see its exact options, e.g.
 `uv run stair train --help`.
 
+`stair train` requires a local CUDA GPU — the vendored trainer has no CPU
+fallback.
+
 ## Configuring a run
 
 Every setting the pipeline uses — which model to train, how many epochs,
