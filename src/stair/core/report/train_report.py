@@ -106,6 +106,34 @@ def diagnose(train_entries, eval_entries, report_config, num_train_epochs):
                 f"{num_train_epochs} configured — likely triggered by early stopping."
             )
 
+    lr_low_relative_improvement_threshold = report_config["lr_low_relative_improvement_threshold"]
+    first_train_loss = train_entries[0]["loss"]
+    last_train_loss = train_entries[-1]["loss"]
+    if first_train_loss != 0:
+        overall_relative_improvement = (first_train_loss - last_train_loss) / first_train_loss
+        if overall_relative_improvement < lr_low_relative_improvement_threshold:
+            diagnostics.append(
+                f"Learning rate may be too low: train loss only improved by "
+                f"{overall_relative_improvement * 100:.1f}% over the whole run. "
+                f"Try a higher learning rate."
+            )
+
+    lr_high_spike_relative_increase = report_config["lr_high_spike_relative_increase"]
+    for entry_index in range(1, len(train_entries)):
+        previous_loss = train_entries[entry_index - 1]["loss"]
+        current_loss = train_entries[entry_index]["loss"]
+        if previous_loss == 0:
+            continue
+        relative_increase = (current_loss - previous_loss) / previous_loss
+        if relative_increase > lr_high_spike_relative_increase:
+            spike_step = train_entries[entry_index]["step"]
+            diagnostics.append(
+                f"Learning rate may be too high: train loss spiked by more than "
+                f"{lr_high_spike_relative_increase * 100:.0f}% between two logged "
+                f"steps (step {spike_step}). Try a lower learning rate."
+            )
+            break
+
     if not diagnostics:
         diagnostics.append("No issues detected: eval loss is trending down without a plateau.")
 
