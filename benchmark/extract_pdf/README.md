@@ -1,3 +1,0 @@
-###
-
-1. Extract PDF
