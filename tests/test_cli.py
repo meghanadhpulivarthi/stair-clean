@@ -1,10 +1,11 @@
+import os
 import subprocess
 import sys
 
 
-def run_stair(*args):
+def run_stair(*args, env=None):
     command = [sys.executable, "-m", "stair.cli"] + list(args)
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, env=env)
     return result
 
 
@@ -63,6 +64,35 @@ def test_prepare_data_with_malformed_yaml_override_fails_loudly(tmp_path):
 
     assert result.returncode != 0
     assert "Traceback" not in result.stderr
+
+
+def test_prepare_data_with_unparseable_corpus_fails_loudly_not_with_a_traceback(tmp_path):
+    # pypdfium2 raises PdfiumError (a RuntimeError) for a corpus that isn't
+    # a real PDF at all — this is outside the (OSError, ValueError) that
+    # config resolution errors use, and represents the broader class of
+    # non-OSError/ValueError failures (e.g. from a real LLM/openai client)
+    # that the CLI must still turn into a clean one-line stderr message
+    corpus_path = tmp_path / "corpus.pdf"
+    corpus_path.write_text("not a real pdf, just needs to exist for this test")
+    out_dir = tmp_path / "out"
+
+    # provide fake LLM env vars so the run gets past the fail-fast env-var
+    # check and actually reaches PDF parsing, where PdfiumError is raised
+    fake_llm_env = dict(os.environ)
+    fake_llm_env["STAIR_LLM_API_BASE"] = "http://localhost:0"
+    fake_llm_env["STAIR_LLM_API_KEY"] = "fake-key"
+    fake_llm_env["STAIR_LLM_MODEL"] = "fake-model"
+
+    result = run_stair(
+        "prepare-data",
+        "--corpus", str(corpus_path),
+        "--out", str(out_dir),
+        env=fake_llm_env,
+    )
+
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "stair prepare-data:" in result.stderr
 
 
 def test_prepare_data_with_config_pointing_at_a_directory_fails_loudly(tmp_path):

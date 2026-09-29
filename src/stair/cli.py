@@ -105,7 +105,12 @@ def main(argv=None):
     if args.subcommand == "prepare-data":
         try:
             run_prepare_data(args.corpus, args.out, resolved_config)
-        except (OSError, ValueError) as error:
+        # widened beyond (OSError, ValueError): a real run against a live
+        # LLM endpoint can raise exceptions from the openai client
+        # (connection errors, auth errors, rate limits, etc.) that don't
+        # fit those two types, and those should still get the same clean
+        # one-line message instead of a raw traceback
+        except Exception as error:
             print(f"stair prepare-data: {error}", file=sys.stderr)
             return 1
         return 0
