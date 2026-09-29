@@ -66,6 +66,11 @@ def extract_content_for_bookmark(pdf, bookmark):
             if search_result:
                 content = text_page.get_text_range(search_result[0])
             else:
+                # bookmark titles don't always literally appear as page text
+                # (real-world PDFs often render a slightly different heading
+                # than the outline entry's title) — warn instead of silently
+                # dropping this page's content
+                print(f"Could not find bookmark title on its start page: {title!r}")
                 content = ""
         else:
             content = text_page.get_text_range()
@@ -83,6 +88,13 @@ def remove_overlap_with_next_section(raw_sections):
     for section_index, section in enumerate(raw_sections[:-1]):
         last_page_text = section["list_content"][-1]
         next_section_first_page_text = raw_sections[section_index + 1]["list_content"][0]
+
+        # an empty next_section_first_page_text (e.g. because the title
+        # search missed on that page) would otherwise match at index 0 and
+        # truncate this section's last page down to nothing, even though
+        # there was no real overlap to remove
+        if not next_section_first_page_text:
+            continue
 
         overlap_start = last_page_text.find(next_section_first_page_text)
         if overlap_start != -1:
