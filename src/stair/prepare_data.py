@@ -25,6 +25,14 @@ def write_jsonl(path, records):
             output_file.write(json.dumps(record) + "\n")
 
 
+def derive_book_title(corpus_path):
+    # turn a filename stem like "sourdough_bread_guide" into a readable
+    # title like "Sourdough Bread Guide" for use in QA-generation prompts
+    stem = Path(corpus_path).stem
+    words = stem.replace("_", " ").replace("-", " ").split()
+    return " ".join(word.capitalize() for word in words)
+
+
 def build_default_llm_call(config):
     api_base = os.environ.get("STAIR_LLM_API_BASE")
     api_key = os.environ.get("STAIR_LLM_API_KEY")
@@ -45,7 +53,17 @@ def run_prepare_data(corpus_path, out_dir, config, llm_call=None):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     data_config = config["data"]
-    book_title = Path(corpus_path).stem
+    book_title = derive_book_title(corpus_path)
+
+    # fail fast, before any output files are written: a user who forgot to
+    # set the LLM env vars should not end up with a half-populated out_dir
+    # (docs.jsonl/toc.json written, then a late ValueError)
+    if llm_call is None:
+        llm_call = build_default_llm_call(config)
+
+    with open(out_dir / "config.json", "w") as config_file:
+        json.dump(config, config_file, indent=2)
+    print(f"Config saved: {out_dir / 'config.json'}")
 
     print(f"Extracting sections from {corpus_path}")
     sections = extract_sections_from_pdf(
@@ -71,9 +89,6 @@ def run_prepare_data(corpus_path, out_dir, config, llm_call=None):
         chunk_overlap=data_config["chunk_overlap"],
     )
     print(f"Split into {len(chunks)} chunks")
-
-    if llm_call is None:
-        llm_call = build_default_llm_call(config)
 
     qa_pairs = []
     for chunk in chunks:

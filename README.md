@@ -82,6 +82,23 @@ immediately instead of silently ignoring it — open `configs/base.yaml` to
 see every valid setting and what it does (each one has a comment
 explaining it).
 
+### Environment variables for `prepare-data`
+
+`prepare-data`'s synthetic QA-generation step calls an OpenAI-compatible
+LLM endpoint, so you need to set three environment variables before running
+it:
+
+- `STAIR_LLM_API_BASE` — the endpoint's base URL
+- `STAIR_LLM_API_KEY` — your API key for that endpoint
+- `STAIR_LLM_MODEL` — the model name to use
+
+Once those are set, you can try `prepare-data` against the bundled example
+corpus at `data/example_book/sourdough_bread_guide.pdf`:
+
+```
+uv run stair prepare-data --corpus data/example_book/sourdough_bread_guide.pdf --out out/example-run
+```
+
 ## Running the tests
 
 ```

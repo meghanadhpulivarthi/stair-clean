@@ -3,7 +3,7 @@ from pathlib import Path
 from stair.core.data.build_pdf import write_bookmarked_pdf
 
 
-OUTPUT_PATH = Path(__file__).resolve().parents[1] / "data" / "example_book" / "source.pdf"
+OUTPUT_PATH = Path(__file__).resolve().parents[1] / "data" / "example_book" / "sourdough_bread_guide.pdf"
 
 CHAPTERS = [
     (

@@ -1,13 +1,32 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from pdf_fixtures import make_tiny_bookmarked_pdf
 
 from stair.config import resolve_config
-from stair.prepare_data import run_prepare_data
+from stair.prepare_data import derive_book_title, run_prepare_data
 
 
-EXAMPLE_CORPUS_PATH = Path(__file__).resolve().parents[1] / "data" / "example_book" / "source.pdf"
+EXAMPLE_CORPUS_PATH = Path(__file__).resolve().parents[1] / "data" / "example_book" / "sourdough_bread_guide.pdf"
+
+
+def test_derive_book_title_turns_underscores_and_hyphens_into_a_readable_title():
+    assert derive_book_title("sourdough_bread_guide.pdf") == "Sourdough Bread Guide"
+    assert derive_book_title("some-manual-name.pdf") == "Some Manual Name"
+
+
+def test_run_prepare_data_book_title_is_readable_not_a_raw_filename_stem(tmp_path):
+    pdf_path = tmp_path / "tiny_test_book.pdf"
+    make_tiny_bookmarked_pdf(pdf_path)
+    out_dir = tmp_path / "out"
+    config = resolve_config(override_path=None)
+
+    run_prepare_data(pdf_path, out_dir, config, llm_call=fake_llm_call)
+
+    toc = json.loads((out_dir / "toc.json").read_text())
+    assert toc["title"] == "Tiny Test Book"
 
 
 def fake_llm_call(messages):
@@ -83,3 +102,36 @@ def test_bundled_example_corpus_produces_a_realistic_split(tmp_path):
     assert counts["sections"] >= 4
     assert counts["qa_pairs"] > 0
     assert counts["train"] + counts["val"] + counts["test"] == counts["qa_pairs"]
+
+
+def test_run_prepare_data_writes_config_json(tmp_path):
+    pdf_path = tmp_path / "tiny.pdf"
+    make_tiny_bookmarked_pdf(pdf_path)
+    out_dir = tmp_path / "out"
+    config = resolve_config(override_path=None)
+
+    run_prepare_data(pdf_path, out_dir, config, llm_call=fake_llm_call)
+
+    assert (out_dir / "config.json").exists()
+    saved_config = json.loads((out_dir / "config.json").read_text())
+    assert saved_config == config
+
+
+def test_run_prepare_data_fails_fast_before_writing_any_files_when_llm_env_vars_missing(tmp_path, monkeypatch):
+    monkeypatch.delenv("STAIR_LLM_API_BASE", raising=False)
+    monkeypatch.delenv("STAIR_LLM_API_KEY", raising=False)
+    monkeypatch.delenv("STAIR_LLM_MODEL", raising=False)
+
+    pdf_path = tmp_path / "tiny.pdf"
+    make_tiny_bookmarked_pdf(pdf_path)
+    out_dir = tmp_path / "out"
+    config = resolve_config(override_path=None)
+
+    with pytest.raises(ValueError):
+        run_prepare_data(pdf_path, out_dir, config)
+
+    # the ValueError must fire before docs.jsonl/toc.json/config.json are
+    # written, not after a partial run has already produced output
+    assert not (out_dir / "docs.jsonl").exists()
+    assert not (out_dir / "toc.json").exists()
+    assert not (out_dir / "config.json").exists()
