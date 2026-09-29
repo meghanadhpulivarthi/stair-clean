@@ -61,6 +61,8 @@ eval:
   # recall/precision/NDCG/MRR are reported at each of these cutoffs
   ks: [1, 3, 5, 10]
   top_k: 10
+  # how many new tokens the fine-tuned model may generate per query at eval time
+  max_new_tokens: 128
 
 report:
   # a run is flagged as "overfitting" once eval loss has been rising for

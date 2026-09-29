@@ -5,6 +5,7 @@ from pathlib import Path
 
 from stair.config import resolve_config
 from stair.core.report.train_report import diagnose, find_latest_checkpoint_state, load_log_history, render_curves, split_log_history
+from stair.eval import run_eval
 from stair.prepare_data import run_prepare_data
 from stair.train import run_train
 
@@ -67,6 +68,10 @@ def add_eval_subcommand(subparsers):
     parser.add_argument(
         "--config", default=None,
         help="Optional override YAML (see configs/base.yaml for all defaults)",
+    )
+    parser.add_argument(
+        "--data", required=True,
+        help="Directory produced by `stair prepare-data` (must contain test.jsonl, toc.json)",
     )
     return parser
 
@@ -161,6 +166,15 @@ def main(argv=None):
         print("Diagnostics:")
         for diagnostic_line in diagnostics:
             print(f"- {diagnostic_line}")
+        return 0
+
+    if args.subcommand == "eval":
+        try:
+            summary = run_eval(args.run, args.data, resolved_config)
+        except (OSError, ValueError) as error:
+            print(f"stair eval: {error}", file=sys.stderr)
+            return 1
+        print(f"Evaluated {summary['count']} examples, hallucination rate: {summary['hallucination_rate']:.2%}")
         return 0
 
     print(f"stair {args.subcommand}: not implemented yet", file=sys.stderr)
