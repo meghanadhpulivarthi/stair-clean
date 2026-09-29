@@ -1,0 +1,67 @@
+# STAIR base config — every tunable the pipeline understands lives here with
+# its default. Never edit this file for a specific run: write a small
+# override YAML with only the keys you want to change and pass it as
+# --config to any `stair` command.
+
+data:
+  # how many tokens per chunk when a section of the corpus is too long to
+  # fit in the table of contents prompt as a single leaf
+  chunk_max_tokens: 2048
+  chunk_overlap: 32
+  # sections shorter than this many words are dropped as noise (headers,
+  # page numbers that slipped past the PDF parser)
+  min_words_in_a_section: 5
+  # synthetic question/answer pairs generated per chunk during `prepare-data`
+  qa_pairs_per_chunk: 3
+  train_fraction: 0.8
+  val_fraction: 0.1
+  test_fraction: 0.1
+  # random seed for the train/val/test split, so re-running prepare-data on
+  # the same corpus reproduces the same split
+  split_seed: 42
+
+model:
+  # small, ungated, chat-template-equipped model so the bundled example
+  # trains on a single modest GPU or (slowly) on CPU without needing a
+  # Hugging Face access token
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  lora:
+    rank: 16
+    alpha: 32
+    dropout: 0.1
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, down_proj, up_proj]
+
+training:
+  learning_rate: 1.0e-4
+  lr_schedule: constant_with_warmup
+  warmup_steps: 20
+  num_train_epochs: 3
+  batch_size_per_gpu: 4
+  gradient_accumulation_steps: 4
+  max_seq_length: 2048
+  eval_strategy: steps
+  eval_interval: 30
+  save_interval: 30
+  save_total_limit: 3
+  # stop early if eval loss hasn't improved for this many evals, so a small
+  # example corpus doesn't overfit for the full epoch budget by default
+  early_stopping: true
+  early_stopping_patience: 5
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  # 1 = single GPU, no multi-node. Raise to use more local GPUs.
+  num_gpus: 1
+
+eval:
+  # recall/precision/NDCG/MRR are reported at each of these cutoffs
+  ks: [1, 3, 5, 10]
+  top_k: 10
+
+report:
+  # a run is flagged as "overfitting" once eval loss has been rising for
+  # this many consecutive logged evals while train loss keeps falling
+  overfitting_patience_evals: 3
+  # a run is flagged as "plateaued" once the best eval loss hasn't improved
+  # by at least this relative fraction over the last `plateau_patience_evals`
+  plateau_relative_improvement: 0.01
+  plateau_patience_evals: 5
