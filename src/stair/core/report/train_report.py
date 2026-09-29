@@ -113,6 +113,12 @@ def diagnose(train_entries, eval_entries, report_config, num_train_epochs):
 
 
 def render_curves(train_entries, eval_entries):
+    # plotext>=6.1.0 replaced the old module-level plotext.plot()/xlabel()/
+    # ylabel() convenience functions with a chained object API on
+    # plotext.figure (figure.signal(x, y).lines().label(...), figure.label(
+    # ..., axis="x"/"y")) — see plotext.figure.signal/label docstrings.
+    plotext.figure.clear()
+
     if not train_entries:
         print("No training data yet.")
     else:
@@ -121,7 +127,7 @@ def render_curves(train_entries, eval_entries):
         for entry in train_entries:
             train_steps.append(entry["step"])
             train_losses.append(entry["loss"])
-        plotext.plot(train_steps, train_losses, label="train loss")
+        plotext.figure.signal(train_steps, train_losses).lines().label("train loss")
 
     if not eval_entries:
         print("No eval data yet.")
@@ -131,10 +137,10 @@ def render_curves(train_entries, eval_entries):
         for entry in eval_entries:
             eval_steps.append(entry["step"])
             eval_losses.append(entry["eval_loss"])
-        plotext.plot(eval_steps, eval_losses, label="eval loss")
+        plotext.figure.signal(eval_steps, eval_losses).lines().label("eval loss")
 
     if train_entries or eval_entries:
-        plotext.title("Training curves")
-        plotext.xlabel("step")
-        plotext.ylabel("loss")
-        plotext.show()
+        plotext.figure.title("Training curves")
+        plotext.figure.label("step", axis="x")
+        plotext.figure.label("loss", axis="y")
+        plotext.figure.show()
