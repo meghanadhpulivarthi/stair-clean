@@ -84,3 +84,39 @@ def test_run_train_returns_nonzero_returncode_without_raising(tmp_path):
     result = run_train(str(data_dir), str(run_dir), config, subprocess_run=make_fake_subprocess_run(1))
 
     assert result["returncode"] == 1
+
+
+def test_run_train_resolves_relative_data_and_run_dirs_to_absolute_paths(tmp_path, monkeypatch):
+    # torchrun is launched with cwd=VENDORED_TRAINER_SCRIPT.parent, so a
+    # relative --data/--out path must be resolved to an absolute path before
+    # being handed to the CLI args builder, or the vendored trainer looks
+    # for train.jsonl/writes checkpoints under the wrong directory
+    data_dir = make_complete_data_dir(tmp_path)
+    run_dir = tmp_path / "run"
+    config = resolve_config(override_path=None)
+    fake_subprocess_run = make_fake_subprocess_run(0)
+
+    monkeypatch.chdir(tmp_path)
+    relative_data_dir = data_dir.relative_to(tmp_path)
+    relative_run_dir = run_dir.relative_to(tmp_path)
+
+    run_train(str(relative_data_dir), str(relative_run_dir), config, subprocess_run=fake_subprocess_run)
+
+    invoked_command = fake_subprocess_run.calls[0]
+    save_path_index = invoked_command.index("--save_path") + 1
+    assert invoked_command[save_path_index] == str(run_dir.resolve())
+    assert Path(invoked_command[save_path_index]).is_absolute()
+
+
+def test_run_train_writes_a_valid_round_trippable_config_json(tmp_path):
+    data_dir = make_complete_data_dir(tmp_path)
+    run_dir = tmp_path / "run"
+    config = resolve_config(override_path=None)
+
+    run_train(str(data_dir), str(run_dir), config, subprocess_run=make_fake_subprocess_run(0))
+
+    config_path = run_dir / "config.json"
+    assert config_path.exists()
+    with open(config_path, "r") as config_file:
+        loaded_config = json.load(config_file)
+    assert loaded_config == config

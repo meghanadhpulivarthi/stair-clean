@@ -1,5 +1,7 @@
 import argparse
+import json
 import sys
+from pathlib import Path
 
 from stair.config import resolve_config
 from stair.core.report.train_report import diagnose, find_latest_checkpoint_state, load_log_history, render_curves, split_log_history
@@ -138,9 +140,22 @@ def main(argv=None):
         log_history = load_log_history(trainer_state_path)
         train_entries, eval_entries = split_log_history(log_history)
         render_curves(train_entries, eval_entries)
-        base_config = resolve_config(override_path=None)
+        run_config_path = Path(args.run) / "config.json"
+        if run_config_path.exists():
+            with open(run_config_path, "r") as run_config_file:
+                report_run_config = json.load(run_config_file)
+        else:
+            print(
+                f"stair report-train: no config.json found under {args.run}, "
+                f"using base config defaults for diagnostics",
+                file=sys.stderr,
+            )
+            report_run_config = resolve_config(override_path=None)
         diagnostics = diagnose(
-            train_entries, eval_entries, base_config["report"], base_config["training"]["num_train_epochs"]
+            train_entries,
+            eval_entries,
+            report_run_config["report"],
+            report_run_config["training"]["num_train_epochs"],
         )
         print("")
         print("Diagnostics:")
