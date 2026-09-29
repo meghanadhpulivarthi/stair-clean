@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "langchain-text-splitters>=1.1.2",
+    "openai>=3.20.0",
     "pypdfium2>=5.13.0",
     "pyyaml>=6.0",
     "reportlab>=5.0.1",
