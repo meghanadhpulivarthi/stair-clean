@@ -5,7 +5,9 @@ description = "Parse, train, and evaluate STAIR retrieval models on your own cor
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pypdfium2>=5.13.0",
     "pyyaml>=6.0",
+    "reportlab>=5.0.1",
 ]
 
 [project.scripts]
