@@ -3,6 +3,7 @@ import sys
 
 from stair.config import resolve_config
 from stair.prepare_data import run_prepare_data
+from stair.train import run_train
 
 
 def add_prepare_data_subcommand(subparsers):
@@ -37,6 +38,10 @@ def add_train_subcommand(subparsers):
     parser.add_argument(
         "--out", required=True,
         help="Output run directory for checkpoints and logs",
+    )
+    parser.add_argument(
+        "--data", required=True,
+        help="Directory produced by `stair prepare-data` (must contain train.jsonl, val.jsonl, toc.json)",
     )
     return parser
 
@@ -114,6 +119,14 @@ def main(argv=None):
             print(f"stair prepare-data: {error}", file=sys.stderr)
             return 1
         return 0
+
+    if args.subcommand == "train":
+        try:
+            result = run_train(args.data, args.out, resolved_config)
+        except (OSError, ValueError) as error:
+            print(f"stair train: {error}", file=sys.stderr)
+            return 1
+        return 0 if result["returncode"] == 0 else 1
 
     print(f"stair {args.subcommand}: not implemented yet", file=sys.stderr)
     return 1
