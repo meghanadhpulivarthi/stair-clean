@@ -2,6 +2,7 @@ import argparse
 import sys
 
 from stair.config import resolve_config
+from stair.core.report.train_report import diagnose, find_latest_checkpoint_state, load_log_history, render_curves, split_log_history
 from stair.prepare_data import run_prepare_data
 from stair.train import run_train
 
@@ -127,6 +128,25 @@ def main(argv=None):
             print(f"stair train: {error}", file=sys.stderr)
             return 1
         return 0 if result["returncode"] == 0 else 1
+
+    if args.subcommand == "report-train":
+        try:
+            trainer_state_path = find_latest_checkpoint_state(args.run)
+        except FileNotFoundError as error:
+            print(f"stair report-train: {error}", file=sys.stderr)
+            return 1
+        log_history = load_log_history(trainer_state_path)
+        train_entries, eval_entries = split_log_history(log_history)
+        render_curves(train_entries, eval_entries)
+        base_config = resolve_config(override_path=None)
+        diagnostics = diagnose(
+            train_entries, eval_entries, base_config["report"], base_config["training"]["num_train_epochs"]
+        )
+        print("")
+        print("Diagnostics:")
+        for diagnostic_line in diagnostics:
+            print(f"- {diagnostic_line}")
+        return 0
 
     print(f"stair {args.subcommand}: not implemented yet", file=sys.stderr)
     return 1
