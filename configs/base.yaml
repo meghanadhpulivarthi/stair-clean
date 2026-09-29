@@ -22,8 +22,8 @@ data:
 
 model:
   # small, ungated, chat-template-equipped model so the bundled example
-  # trains on a single modest GPU or (slowly) on CPU without needing a
-  # Hugging Face access token
+  # trains without needing a Hugging Face access token. Training requires a
+  # local CUDA GPU — the vendored trainer has no CPU fallback.
   name: Qwen/Qwen2.5-0.5B-Instruct
   lora:
     rank: 16
@@ -49,6 +49,11 @@ training:
   early_stopping_patience: 5
   metric_for_best_model: eval_loss
   greater_is_better: false
+  # which side to pad sequences on; "right" is standard for causal LM fine-tuning
+  padding_side: right
+  # load the best checkpoint (by metric_for_best_model) at the end of training,
+  # rather than keeping whatever the last checkpoint happened to be
+  load_best_model_at_end: true
   # 1 = single GPU, no multi-node. Raise to use more local GPUs.
   num_gpus: 1
 
@@ -65,3 +70,9 @@ report:
   # by at least this relative fraction over the last `plateau_patience_evals`
   plateau_relative_improvement: 0.01
   plateau_patience_evals: 5
+  # flags "LR may be too low" if train loss improves by less than this fraction
+  # from the first to the last logged step of the whole run
+  lr_low_relative_improvement_threshold: 0.05
+  # flags "LR may be too high" if train loss jumps up by more than this fraction
+  # between two consecutive logged steps
+  lr_high_spike_relative_increase: 0.5

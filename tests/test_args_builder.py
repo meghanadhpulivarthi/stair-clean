@@ -1,4 +1,6 @@
 import json
+import sys
+from pathlib import Path
 
 from stair.config import resolve_config
 from stair.core.train.args_builder import build_training_cli_args
@@ -29,7 +31,11 @@ def test_build_training_cli_args_sets_required_fields():
     assert args_as_dict["model_name"] == config["model"]["name"]
     assert args_as_dict["save_path"] == "runs/example"
     assert args_as_dict["batch_size_per_gpu"] == str(config["training"]["batch_size_per_gpu"])
-    assert args_as_dict["report_to"] == "none"
+    assert args_as_dict["report_to"] == "no"
+    assert args_as_dict["padding_side"] == config["training"]["padding_side"]
+    assert args_as_dict["load_best_model_at_end"] == str(config["training"]["load_best_model_at_end"])
+    assert args_as_dict["metric_for_best_model"] == config["training"]["metric_for_best_model"]
+    assert args_as_dict["greater_is_better"] == str(config["training"]["greater_is_better"])
 
 
 def test_build_training_cli_args_datasets_field_is_valid_json_with_one_dataset():
@@ -78,3 +84,41 @@ def test_build_training_cli_args_optimizer_field_carries_configured_learning_rat
 
     optimizer = json.loads(args_as_dict["optimizer"])
     assert optimizer["lr"] == config["training"]["learning_rate"]
+
+
+def test_build_training_cli_args_produces_a_valid_training_args_object(tmp_path):
+    # this feeds build_training_cli_args's real output through the vendored
+    # parser's actual value-parsing and pydantic construction, so a future
+    # regression like a str field getting a "none"/"null" value, or a
+    # required trainer attribute never being supplied, gets caught here
+    # instead of requiring a human to construct TrainingArgs by hand
+    vendor_silt_dir = Path(__file__).resolve().parents[1] / "src" / "stair" / "vendor" / "silt"
+    sys.path.insert(0, str(vendor_silt_dir))
+    try:
+        from arguments import parse_value
+        from arguments import TrainingArgs
+
+        config = resolve_config(override_path=None)
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        run_dir = tmp_path / "run"
+
+        cli_args = build_training_cli_args(config, data_dir=str(data_dir), run_dir=str(run_dir))
+
+        parsed_config = {}
+        index = 0
+        while index < len(cli_args):
+            key = cli_args[index].lstrip("-")
+            value = cli_args[index + 1]
+            parsed_config[key] = parse_value(value, key)
+            index += 2
+
+        # TrainingArgs.__init__ -> _post_init -> DatasetArgs._post_init does a
+        # bare `import data` (a sibling module of arguments.py in the vendored
+        # silt dir), so vendor_silt_dir must still be on sys.path for this
+        # call, not just for the `from arguments import ...` statements above
+        training_args = TrainingArgs(**parsed_config)
+    finally:
+        sys.path.remove(str(vendor_silt_dir))
+
+    assert training_args.save_path == str(run_dir)

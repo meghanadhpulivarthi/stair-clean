@@ -82,7 +82,18 @@ def build_training_cli_args(config, data_dir, run_dir):
         "optimizer": build_optimizer_config(training_config),
         "lr_schedule": training_config["lr_schedule"],
         "warmup_steps": training_config["warmup_steps"],
-        "report_to": "none",
+        # "no" (not "none") — the vendored parser's parse_value() converts any
+        # CLI value that case-insensitively equals "null"/"none" into Python
+        # None before it reaches pydantic, but TrainingArgs.report_to is a
+        # plain str field, so "none" would crash with a ValidationError.
+        # "no" survives parse_value() unchanged and is what HuggingFace's
+        # underlying training-arguments machinery accepts to mean "no
+        # reporting integrations".
+        "report_to": "no",
+        "padding_side": training_config["padding_side"],
+        "load_best_model_at_end": training_config["load_best_model_at_end"],
+        "metric_for_best_model": training_config["metric_for_best_model"],
+        "greater_is_better": training_config["greater_is_better"],
         "datasets": [dataset_config],
     }
 
