@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from stair.config import resolve_config
+from stair.core.report.eval_report import flag_weak_spots, load_eval_metrics, render_metrics_table
 from stair.core.report.train_report import diagnose, find_latest_checkpoint_state, load_log_history, render_curves, split_log_history
 from stair.eval import run_eval
 from stair.prepare_data import run_prepare_data
@@ -175,6 +176,22 @@ def main(argv=None):
             print(f"stair eval: {error}", file=sys.stderr)
             return 1
         print(f"Evaluated {summary['count']} examples, hallucination rate: {summary['hallucination_rate']:.2%}")
+        return 0
+
+    if args.subcommand == "report-eval":
+        try:
+            summary = load_eval_metrics(args.run)
+        except FileNotFoundError as error:
+            print(f"stair report-eval: {error}", file=sys.stderr)
+            return 1
+        base_config = resolve_config(override_path=None)
+        render_metrics_table(summary, base_config["eval"]["ks"])
+        warnings = flag_weak_spots(summary, base_config["eval"])
+        if warnings:
+            print("")
+            print("Weak spots:")
+            for warning in warnings:
+                print(f"- {warning}")
         return 0
 
     print(f"stair {args.subcommand}: not implemented yet", file=sys.stderr)

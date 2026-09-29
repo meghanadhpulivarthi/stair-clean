@@ -63,6 +63,12 @@ eval:
   top_k: 10
   # how many new tokens the fine-tuned model may generate per query at eval time
   max_new_tokens: 128
+  # report-eval flags recall@k as weak if it falls below this value, for the
+  # smallest configured k (the most forgiving cutoff — if even that's low,
+  # the model is struggling)
+  weak_recall_threshold: 0.5
+  # report-eval flags the run's hallucination rate as high if it exceeds this
+  high_hallucination_rate_threshold: 0.2
 
 report:
   # a run is flagged as "overfitting" once eval loss has been rising for
