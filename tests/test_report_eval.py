@@ -2,7 +2,12 @@ import json
 
 import pytest
 
-from stair.core.report.eval_report import flag_weak_spots, load_eval_metrics, render_metrics_table
+from stair.core.report.eval_report import (
+    extract_ks_from_metrics,
+    flag_weak_spots,
+    load_eval_metrics,
+    render_metrics_table,
+)
 
 
 EVAL_CONFIG = {
@@ -71,3 +76,41 @@ def test_flag_weak_spots_returns_empty_list_when_healthy():
     warnings = flag_weak_spots(summary, EVAL_CONFIG)
 
     assert warnings == []
+
+
+def test_extract_ks_from_metrics_derives_ks_from_metrics_keys_skipping_gaps():
+    # a run whose eval.ks override skipped 3 (e.g. only [1, 5] were
+    # actually computed) must render exactly those two columns, not
+    # whatever the base config's default eval.ks happens to list
+    metrics = {"recall@1": 0.8, "recall@5": 0.6, "mrr@1": 0.7, "mrr@5": 0.5}
+
+    ks = extract_ks_from_metrics(metrics)
+
+    assert ks == [1, 5]
+
+
+def test_extract_ks_from_metrics_returns_empty_list_for_empty_metrics():
+    assert extract_ks_from_metrics({}) == []
+
+
+def test_render_metrics_table_renders_columns_from_extracted_ks_not_base_config(capsys):
+    # regression test for finding 5: eval_metrics.json written with
+    # override ks [1, 5] must render a table with @1 and @5 columns, not
+    # "-" placeholders for @3 (the base config's default)
+    summary = {
+        "count": 4,
+        "hallucination_rate": 0.0,
+        "metrics": {"recall@1": 0.8, "recall@5": 0.6},
+    }
+
+    ks = extract_ks_from_metrics(summary["metrics"])
+    render_metrics_table(summary, ks)
+
+    captured_output = capsys.readouterr().out
+    header_line = captured_output.split("\n")[3]
+    recall_line = [line for line in captured_output.split("\n") if line.startswith("recall")][0]
+    assert "@1" in header_line
+    assert "@5" in header_line
+    assert "@3" not in header_line
+    assert "0.800" in recall_line
+    assert "0.600" in recall_line

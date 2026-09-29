@@ -90,9 +90,10 @@ def run_eval(run_dir, data_dir, config, generate_call=None):
     total_predicted_entries = 0
     result_records = []
 
+    test_count = len(test_records)
     results_path = eval_output_dir / "eval_results.jsonl"
     with open(results_path, "w") as results_file:
-        for test_record in test_records:
+        for example_index, test_record in enumerate(test_records):
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
@@ -128,9 +129,10 @@ def run_eval(run_dir, data_dir, config, generate_call=None):
             result_records.append(result_record)
             results_file.write(json.dumps(result_record) + "\n")
 
+            print(f"Evaluated {example_index + 1}/{test_count} examples")
+
     print(f"Results saved: {results_path}")
 
-    test_count = len(test_records)
     averaged_metrics = {}
     for metric_name, total_value in metrics_totals.items():
         averaged_metrics[metric_name] = total_value / test_count if test_count else 0.0

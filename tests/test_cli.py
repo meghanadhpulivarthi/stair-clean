@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -111,3 +112,36 @@ def test_prepare_data_with_config_pointing_at_a_directory_fails_loudly(tmp_path)
 
     assert result.returncode != 0
     assert "Traceback" not in result.stderr
+
+
+def test_eval_with_run_config_missing_model_name_fails_loudly_not_with_a_traceback(tmp_path):
+    # run_dir's own config.json (written by `stair train`) is missing the
+    # model.name key that build_default_generate_call reads to load the
+    # base model. That raises a KeyError, which is outside the
+    # (OSError, ValueError) that config-resolution errors use - this
+    # exercises the same broadened-exception-handling gap already fixed for
+    # stair prepare-data, now fixed for stair eval too, without needing a
+    # real model download or GPU
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    toc = {
+        "title": "Test Book",
+        "table_of_contents": [
+            {"id": "1", "section_num": "1", "title": "Introduction", "leaf": True},
+        ],
+    }
+    (data_dir / "toc.json").write_text(json.dumps(toc))
+    test_records = [{"question": "What is this about?", "answer": "testing", "reference": ["1"]}]
+    with open(data_dir / "test.jsonl", "w") as test_file:
+        for record in test_records:
+            test_file.write(json.dumps(record) + "\n")
+
+    run_dir = tmp_path / "run"
+    (run_dir / "checkpoint-best").mkdir(parents=True)
+    (run_dir / "config.json").write_text(json.dumps({"model": {}}))
+
+    result = run_stair("eval", "--run", str(run_dir), "--data", str(data_dir))
+
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+    assert "stair eval:" in result.stderr

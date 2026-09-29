@@ -4,7 +4,12 @@ import sys
 from pathlib import Path
 
 from stair.config import resolve_config
-from stair.core.report.eval_report import flag_weak_spots, load_eval_metrics, render_metrics_table
+from stair.core.report.eval_report import (
+    extract_ks_from_metrics,
+    flag_weak_spots,
+    load_eval_metrics,
+    render_metrics_table,
+)
 from stair.core.report.train_report import diagnose, find_latest_checkpoint_state, load_log_history, render_curves, split_log_history
 from stair.eval import run_eval
 from stair.prepare_data import run_prepare_data
@@ -172,7 +177,12 @@ def main(argv=None):
     if args.subcommand == "eval":
         try:
             summary = run_eval(args.run, args.data, resolved_config)
-        except (OSError, ValueError) as error:
+        # widened beyond (OSError, ValueError), the same pattern already
+        # used for stair prepare-data's branch above: a real run touches
+        # transformers/peft/torch (model download, out-of-memory, an
+        # incompatible older config.json, import errors, ...), none of
+        # which are guaranteed to be OSError or ValueError
+        except Exception as error:
             print(f"stair eval: {error}", file=sys.stderr)
             return 1
         print(f"Evaluated {summary['count']} examples, hallucination rate: {summary['hallucination_rate']:.2%}")
@@ -185,7 +195,11 @@ def main(argv=None):
             print(f"stair report-eval: {error}", file=sys.stderr)
             return 1
         base_config = resolve_config(override_path=None)
-        render_metrics_table(summary, base_config["eval"]["ks"])
+        # ks come from the run's own recorded metrics (finding 5), not from
+        # the base config's eval.ks - a run started with a --config
+        # override may have used different ks than the base default
+        ks = extract_ks_from_metrics(summary["metrics"])
+        render_metrics_table(summary, ks)
         warnings = flag_weak_spots(summary, base_config["eval"])
         if warnings:
             print("")

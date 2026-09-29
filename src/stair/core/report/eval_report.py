@@ -12,6 +12,23 @@ def load_eval_metrics(run_dir):
         return json.load(metrics_file)
 
 
+def extract_ks_from_metrics(metrics):
+    # derives the k values actually computed for this run from the metrics
+    # dict's own keys (e.g. "recall@1" -> 1), instead of reading eval.ks
+    # from the base config - a run started with `--config override.yaml`
+    # may have used different eval.ks than the base default, and reading
+    # from the base config would silently render a table of "-"
+    # placeholders with no error. flag_weak_spots already derives its
+    # smallest-k this way; this brings render_metrics_table's ks in line
+    # with that same pattern.
+    ks = set()
+    for metric_key in metrics:
+        if "@" in metric_key:
+            k_part = metric_key.split("@")[1]
+            ks.add(int(k_part))
+    return sorted(ks)
+
+
 def render_metrics_table(summary, ks):
     print(f"Evaluated {summary['count']} examples")
     print(f"Hallucination rate: {summary['hallucination_rate']:.2%}")

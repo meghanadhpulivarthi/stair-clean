@@ -116,3 +116,24 @@ def test_run_eval_tracks_hallucination_rate_for_unparseable_generations(tmp_path
     result = run_eval(str(run_dir), str(data_dir), config, generate_call=fake_generate_call)
 
     assert result["hallucination_rate"] > 0.0
+
+
+def test_run_eval_prints_progress_between_loaded_and_results_saved(tmp_path, capsys):
+    # traceability.md requires printing intermediate progress, not only
+    # totals at the end - for a slow real-generation run this loop can take
+    # a long time per example, so silence here would look like a hang
+    data_dir = make_complete_data_dir(tmp_path)
+    config = resolve_config(override_path=None)
+    run_dir = make_complete_run_dir(tmp_path, config)
+    fake_generate_call = make_fake_generate_call({})
+
+    run_eval(str(run_dir), str(data_dir), config, generate_call=fake_generate_call)
+
+    captured_output = capsys.readouterr().out
+    loaded_line_index = captured_output.find("Loaded 2 test examples")
+    results_saved_line_index = captured_output.find("Results saved")
+    assert loaded_line_index != -1
+    assert results_saved_line_index != -1
+    between_lines = captured_output[loaded_line_index:results_saved_line_index]
+    assert "Evaluated 1/2 examples" in between_lines
+    assert "Evaluated 2/2 examples" in between_lines
