@@ -96,7 +96,7 @@ def main(argv=None):
     if hasattr(args, "config"):
         try:
             resolve_config(override_path=args.config)
-        except (FileNotFoundError, ValueError) as error:
+        except (OSError, ValueError) as error:
             print(f"stair {args.subcommand}: {error}", file=sys.stderr)
             return 1
 

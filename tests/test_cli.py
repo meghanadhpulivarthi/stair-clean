@@ -45,3 +45,39 @@ def test_prepare_data_with_bad_override_key_fails_loudly(tmp_path):
 
     assert result.returncode != 0
     assert "lroa_rank" in result.stderr
+
+
+def test_prepare_data_with_malformed_yaml_override_fails_loudly(tmp_path):
+    override_path = tmp_path / "malformed.yaml"
+    override_path.write_text("model:\n  lora:\n  rank: [unclosed\n")
+    corpus_path = tmp_path / "corpus.pdf"
+    corpus_path.write_text("not a real pdf, just needs to exist for this test")
+    out_dir = tmp_path / "out"
+
+    result = run_stair(
+        "prepare-data",
+        "--corpus", str(corpus_path),
+        "--out", str(out_dir),
+        "--config", str(override_path),
+    )
+
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr
+
+
+def test_prepare_data_with_config_pointing_at_a_directory_fails_loudly(tmp_path):
+    corpus_path = tmp_path / "corpus.pdf"
+    corpus_path.write_text("not a real pdf, just needs to exist for this test")
+    out_dir = tmp_path / "out"
+    directory_as_config = tmp_path / "not_a_file"
+    directory_as_config.mkdir()
+
+    result = run_stair(
+        "prepare-data",
+        "--corpus", str(corpus_path),
+        "--out", str(out_dir),
+        "--config", str(directory_as_config),
+    )
+
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr

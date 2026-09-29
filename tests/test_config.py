@@ -89,6 +89,13 @@ def test_resolve_config_empty_override_file_is_a_noop(tmp_path):
     assert resolved == base_only
 
 
+def test_load_yaml_file_non_mapping_document_raises_value_error(tmp_path):
+    config_path = tmp_path / "list_document.yaml"
+    config_path.write_text("- a\n- b\n")
+    with pytest.raises(ValueError, match="must be a mapping"):
+        load_yaml_file(config_path)
+
+
 def test_resolve_config_rejects_unknown_override_key(tmp_path):
     override_path = tmp_path / "override.yaml"
     override_path.write_text(

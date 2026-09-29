@@ -11,10 +11,20 @@ def load_yaml_file(path):
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
+    if path.is_dir():
+        raise OSError(f"Config path is a directory, not a file: {path}")
     with open(path, "r") as config_file:
-        loaded = yaml.safe_load(config_file)
+        try:
+            loaded = yaml.safe_load(config_file)
+        except yaml.YAMLError as parse_error:
+            raise ValueError(f"Could not parse config file {path}: {parse_error}")
     if loaded is None:
         return {}
+    if not isinstance(loaded, dict):
+        raise ValueError(
+            f"Config file {path} must be a mapping of keys to values, "
+            f"got {type(loaded).__name__}"
+        )
     return loaded
 
 
