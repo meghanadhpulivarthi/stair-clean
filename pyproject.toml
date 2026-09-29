@@ -5,11 +5,23 @@ description = "Parse, train, and evaluate STAIR retrieval models on your own cor
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate>=1.15.0",
+    "datasets>=5.0.1",
+    "ipython>=9.17.1",
+    "jsonlines>=4.0.0",
     "langchain-text-splitters>=1.1.2",
+    "llama-index-core>=0.14.25",
     "openai>=3.20.0",
+    "pandas>=3.0.6",
+    "peft>=0.21.1",
+    "plotext>=6.1.0",
     "pypdfium2>=5.13.0",
     "pyyaml>=6.0",
     "reportlab>=5.0.1",
+    "torch>=2.14.0",
+    "tqdm>=4.70.1",
+    "transformers>=5.17.0",
+    "trl>=1.14.0",
 ]
 
 [project.scripts]
