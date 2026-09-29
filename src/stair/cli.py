@@ -1,6 +1,8 @@
 import argparse
 import sys
 
+from stair.config import resolve_config
+
 
 def add_prepare_data_subcommand(subparsers):
     parser = subparsers.add_parser(
@@ -90,6 +92,13 @@ def main(argv=None):
     if args.subcommand is None:
         parser.print_usage(sys.stderr)
         return 1
+
+    if hasattr(args, "config"):
+        try:
+            resolve_config(override_path=args.config)
+        except (FileNotFoundError, ValueError) as error:
+            print(f"stair {args.subcommand}: {error}", file=sys.stderr)
+            return 1
 
     print(f"stair {args.subcommand}: not implemented yet", file=sys.stderr)
     return 1
