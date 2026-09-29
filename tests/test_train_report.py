@@ -6,6 +6,7 @@ from stair.core.report.train_report import (
     diagnose,
     find_latest_checkpoint_state,
     load_log_history,
+    render_curves,
     split_log_history,
 )
 
@@ -125,3 +126,52 @@ def test_diagnose_flags_plateau_when_eval_loss_stops_improving():
 
     joined_diagnostics = " ".join(diagnostics).lower()
     assert "plateau" in joined_diagnostics
+
+
+def test_render_curves_with_no_train_and_no_eval_entries_prints_placeholders(capsys):
+    render_curves(train_entries=[], eval_entries=[])
+
+    captured_output = capsys.readouterr().out
+    assert "no training data" in captured_output.lower()
+    assert "no eval data" in captured_output.lower()
+
+
+def test_render_curves_with_train_entries_and_no_eval_entries_does_not_raise(capsys):
+    train_entries = [
+        {"loss": 1.0, "step": 1, "epoch": 1},
+        {"loss": 0.8, "step": 2, "epoch": 2},
+    ]
+
+    render_curves(train_entries=train_entries, eval_entries=[])
+
+    captured_output = capsys.readouterr().out
+    assert "no eval data" in captured_output.lower()
+
+
+def test_render_curves_with_eval_entries_and_no_train_entries_does_not_raise(capsys):
+    eval_entries = [
+        {"eval_loss": 0.9, "step": 1, "epoch": 1},
+        {"eval_loss": 0.85, "step": 2, "epoch": 2},
+    ]
+
+    render_curves(train_entries=[], eval_entries=eval_entries)
+
+    captured_output = capsys.readouterr().out
+    assert "no training data" in captured_output.lower()
+
+
+def test_render_curves_with_both_train_and_eval_entries_does_not_raise(capsys):
+    train_entries = [
+        {"loss": 1.0, "step": 1, "epoch": 1},
+        {"loss": 0.8, "step": 2, "epoch": 2},
+    ]
+    eval_entries = [
+        {"eval_loss": 0.9, "step": 1, "epoch": 1},
+        {"eval_loss": 0.85, "step": 2, "epoch": 2},
+    ]
+
+    render_curves(train_entries=train_entries, eval_entries=eval_entries)
+
+    captured_output = capsys.readouterr().out
+    assert "no training data" not in captured_output.lower()
+    assert "no eval data" not in captured_output.lower()
