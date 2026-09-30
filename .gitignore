@@ -7,3 +7,9 @@ __pycache__/
 docs/superpowers/
 .claude/
 /stair/
+
+# Generated pipeline outputs (never commit)
+runs/
+logs/
+.hf_cache/
+data/example_book/prepared/

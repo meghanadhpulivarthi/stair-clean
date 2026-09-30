@@ -298,7 +298,11 @@ def replace_variables_and_parse(config_path, defaults):
 
     return config
 
-NO_PARSE_KEYS = {}
+# report_to must reach TrainingArgs as the literal string "none": that is the
+# value transformers maps to [] (reporting disabled). Without this exemption,
+# parse_value() below would turn "none" into Python None, which makes
+# transformers fall back to *all* installed reporting integrations instead.
+NO_PARSE_KEYS = {"report_to"}
 
 def parse_value(val, key=None):
     """Convert a value (usually a string) into a Python value if possible.

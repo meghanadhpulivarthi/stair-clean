@@ -70,14 +70,16 @@ def build_training_cli_args(config, data_dir, run_dir):
         "optimizer": build_optimizer_config(training_config),
         "lr_schedule": training_config["lr_schedule"],
         "warmup_steps": training_config["warmup_steps"],
-        # "no" (not "none") — the vendored parser's parse_value() converts any
-        # CLI value that case-insensitively equals "null"/"none" into Python
-        # None before it reaches pydantic, but TrainingArgs.report_to is a
-        # plain str field, so "none" would crash with a ValidationError.
-        # "no" survives parse_value() unchanged and is what HuggingFace's
-        # underlying training-arguments machinery accepts to mean "no
-        # reporting integrations".
-        "report_to": "no",
+        # "none" — the value transformers 5.x maps to [] (reporting disabled).
+        # The old value "no" reached transformers unchanged and was rejected as
+        # an unknown integration name ("no is not supported, only ..."). The
+        # scalar string "none" normally gets turned into Python None by the
+        # vendored parse_value() ("null"/"none" -> None) — which would then make
+        # transformers default to *all* installed integrations — so "report_to"
+        # is listed in that parser's NO_PARSE_KEYS to keep this string intact.
+        # It must stay a scalar str (not a list): TrainingArgs.report_to is a
+        # pydantic str field and rejects a list.
+        "report_to": "none",
         "padding_side": training_config["padding_side"],
         "load_best_model_at_end": training_config["load_best_model_at_end"],
         "metric_for_best_model": training_config["metric_for_best_model"],

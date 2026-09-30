@@ -31,7 +31,10 @@ def test_build_training_cli_args_sets_required_fields():
     assert args_as_dict["model_name"] == config["model"]["name"]
     assert args_as_dict["save_path"] == "runs/example"
     assert args_as_dict["batch_size_per_gpu"] == str(config["training"]["batch_size_per_gpu"])
-    assert args_as_dict["report_to"] == "no"
+    # "none" (not "no"): transformers 5.x maps report_to="none" to [] (no
+    # reporting) and rejects "no" as an unknown integration name. It stays a
+    # scalar string, kept intact through the vendored parser via NO_PARSE_KEYS.
+    assert args_as_dict["report_to"] == "none"
     assert args_as_dict["padding_side"] == config["training"]["padding_side"]
     assert args_as_dict["load_best_model_at_end"] == str(config["training"]["load_best_model_at_end"])
     assert args_as_dict["metric_for_best_model"] == config["training"]["metric_for_best_model"]

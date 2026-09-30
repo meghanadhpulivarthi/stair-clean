@@ -276,7 +276,12 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         intial_checkpoint,
         torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
+        # use PyTorch's built-in scaled-dot-product attention instead of
+        # flash_attention_2: flash-attn is not a declared dependency of this
+        # project (not in pyproject.toml / uv.lock), so forcing FA2 made
+        # `stair train` crash at model load out-of-the-box. sdpa ships with
+        # torch, needs no extra package, and runs on the CUDA GPUs here.
+        attn_implementation="sdpa",
     )
 
     if num_added_tokens > 0:

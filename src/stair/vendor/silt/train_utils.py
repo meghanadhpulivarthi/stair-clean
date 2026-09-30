@@ -52,7 +52,10 @@ def get_training_args(args, **kwargs):
         gradient_checkpointing_kwargs={"use_reentrant": False},
         logging_first_step=True,
         log_level="info",
-        save_safetensors=True,
+        # save_safetensors removed: transformers 5.x (the version locked in
+        # uv.lock) dropped this TrainingArguments/SFTConfig kwarg — safetensors
+        # is now the default save format — and passing it raises TypeError at
+        # config construction. Kept behaviour identical (still saves safetensors).
         save_only_model=False,
         save_on_each_node=True,
         eval_on_start=True,
