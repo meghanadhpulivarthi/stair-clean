@@ -247,8 +247,17 @@ def extract_all_content_as_single_section(pdf, book_title):
 
 
 def extract_sections_from_pdf(pdf_path, book_title, skip_config, min_words_in_a_section):
+    # close the document (and the pages/textpages opened from it) once the
+    # extracted text has been copied out, instead of leaving it to pdfium's
+    # interpreter-exit cleanup
     pdf = pypdfium2.PdfDocument(pdf_path)
+    try:
+        return extract_sections_from_open_pdf(pdf, book_title, skip_config, min_words_in_a_section)
+    finally:
+        pdf.close()
 
+
+def extract_sections_from_open_pdf(pdf, book_title, skip_config, min_words_in_a_section):
     bookmarks_data = extract_bookmarks_data(pdf)
     if not bookmarks_data:
         print("No bookmarks found in the PDF; treating it as a single section.")
